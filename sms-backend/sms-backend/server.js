@@ -24,7 +24,7 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Health check — hit this first to confirm the server is alive
+// Health checks
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "SMS backend is running" });
 });
@@ -37,15 +37,12 @@ app.get("/", (req, res) => {
   res.json({ status: "ok", message: "SMS backend is running" });
 });
 
-// Routes (mounted with and without /api prefix for Vercel serverless compatibility)
+// Routes
 app.use("/api/auth", authRoutes);
-app.use("/auth", authRoutes);
+app.use("/api", authRoutes);
 
 app.use("/api/students", studentRoutes);
-app.use("/students", studentRoutes);
-
 app.use("/api/attendance", attendanceRoutes);
-app.use("/attendance", attendanceRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -1,0 +1,7 @@
+{
+  "name": "whybe-project",
+  "private": true,
+  "scripts": {
+    "build": "cd sms-frontend/sms-frontend && npm install && npm run build"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd sms-frontend/sms-frontend && npm install && npm run build",
+  "outputDirectory": "sms-frontend/sms-frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -33,3 +33,19 @@
 - `✓ Invalid Email Handling`
 - `✓ Missing Credentials Handling`
 - `✓ Protected Route Access` (`/api/auth/me`)
+36: 
+37: ## Deployment Preparation
+38: 
+39: - **Frontend**:
+40:   - Environment variable `VITE_API_URL` set to production API base URL.
+41:   - `npm run build` produces static assets ready for Vercel.
+42: - **Backend**:
+43:   - Use `npm start` on a Node.js host (Vercel Serverless, Render, Fly.io, etc.).
+44:   - Required env vars: `JWT_SECRET`, `MONGO_URI` (optional for persistence), `CORS_ORIGIN` set to the frontend domain.
+45:   - CORS configured to respect `CORS_ORIGIN`.
+46: - **Database**:
+47:   - Recommended MongoDB Atlas instance; connection string supplied via `MONGO_URI`.
+48: - **Authentication**:
+49:   - Demo credentials and Supabase optional remain unchanged.
+50: - **Next steps**: Create the production environment variables, push to GitHub, and trigger Vercel deployment.
+51: 

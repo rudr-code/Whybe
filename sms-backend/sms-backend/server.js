@@ -6,12 +6,22 @@ const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
+const marksRoutes = require("./routes/marksRoutes");
+const subjectRoutes = require("./routes/subjectRoutes");
+const timetableRoutes = require("./routes/timetableRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const attendanceRequestRoutes = require("./routes/attendanceRequestRoutes");
+const messMenuRoutes = require("./routes/messMenuRoutes");
 
 const app = express();
 
 // Middleware
-app.use(cors());
-app.options("*", cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.options('*', cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
 
 // Trigger DB connection attempt on request
@@ -26,15 +36,15 @@ app.use(async (req, res, next) => {
 
 // Health checks
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "SMS backend is running" });
+  res.json({ status: "ok", message: "CampusSync backend is running" });
 });
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", message: "SMS backend is running" });
+  res.json({ status: "ok", message: "CampusSync backend is running" });
 });
 
 app.get("/", (req, res) => {
-  res.json({ status: "ok", message: "SMS backend is running" });
+  res.json({ status: "ok", message: "CampusSync backend is running" });
 });
 
 // Routes
@@ -43,6 +53,12 @@ app.use("/api", authRoutes);
 
 app.use("/api/students", studentRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/marks", marksRoutes);
+app.use("/api/subjects", subjectRoutes);
+app.use("/api/timetable", timetableRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/attendance-requests", attendanceRequestRoutes);
+app.use("/api/mess-menu", messMenuRoutes);
 
 // 404 handler
 app.use((req, res) => {

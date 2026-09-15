@@ -1,98 +1,72 @@
-const mongoose = require("mongoose");
-const Student = require("../models/Student");
-const connectDB = require("../config/db");
+const dataStore = require("../dataStore");
 
-const DEMO_STUDENTS = [
-  { _id: "669000000000000000000101", name: "Aarav Sharma", rollNo: "R1000", class: "10-A", email: "aarav.sharma@student.sms.com", contact: "9876543210", feeStatus: "paid", feeAmount: 10000, grade: "A+" },
-  { _id: "669000000000000000000102", name: "Vivaan Verma", rollNo: "R1001", class: "10-A", email: "vivaan.verma@student.sms.com", contact: "9876543211", feeStatus: "pending", feeAmount: 7500, grade: "A" },
-  { _id: "669000000000000000000103", name: "Aditi Gupta", rollNo: "R1002", class: "10-B", email: "aditi.gupta@student.sms.com", contact: "9876543212", feeStatus: "paid", feeAmount: 10000, grade: "A+" },
-  { _id: "669000000000000000000104", name: "Diya Patel", rollNo: "R1003", class: "11-A", email: "diya.patel@student.sms.com", contact: "9876543213", feeStatus: "overdue", feeAmount: 5000, grade: "B+" },
-  { _id: "669000000000000000000105", name: "Kabir Iyer", rollNo: "R1004", class: "11-B", email: "kabir.iyer@student.sms.com", contact: "9876543214", feeStatus: "paid", feeAmount: 7500, grade: "A" },
-  { _id: "669000000000000000000106", name: "Ishaan Nair", rollNo: "R1005", class: "12-A", email: "ishaan.nair@student.sms.com", contact: "9876543215", feeStatus: "pending", feeAmount: 10000, grade: "B" },
-];
-
-// @route POST /api/students
-const createStudent = async (req, res) => {
-  try {
-    await connectDB();
-    if (mongoose.connection.readyState === 1) {
-      const student = await Student.create(req.body);
-      return res.status(201).json(student);
-    }
-    const newStudent = { _id: `demo-${Date.now()}`, ...req.body };
-    DEMO_STUDENTS.unshift(newStudent);
-    return res.status(201).json(newStudent);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
+// GET /api/students
+const getStudents = (req, res) => {
+  const { branch, section, search } = req.query;
+  let result = [...dataStore.students];
+  if (branch) result = result.filter(s => s.branch === branch);
+  if (section) result = result.filter(s => s.section === section);
+  if (search) {
+    const q = search.toLowerCase();
+    result = result.filter(s =>
+      s.name.toLowerCase().includes(q) || s.rollNo.toLowerCase().includes(q) || s.email.toLowerCase().includes(q)
+    );
   }
+  // Paginate: default 50 per page
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 50;
+  const start = (page - 1) * limit;
+  const paginated = result.slice(start, start + limit);
+  res.json({ students: paginated, total: result.length, page, totalPages: Math.ceil(result.length / limit) });
 };
 
-// @route GET /api/students
-const getStudents = async (req, res) => {
-  try {
-    await connectDB();
-    if (mongoose.connection.readyState === 1) {
-      const students = await Student.find().sort({ createdAt: -1 });
-      if (students && students.length > 0) {
-        return res.json(students);
-      }
-    }
-    res.json(DEMO_STUDENTS);
-  } catch (err) {
-    res.json(DEMO_STUDENTS);
+// GET /api/students/:id
+const getStudentById = (req, res) => {
+  const student = dataStore.findById("students", req.params.id);
+  if (!student) return res.status(404).json({ message: "Student not found" });
+  // Include marks and attendance summary
+  const studentMarks = dataStore.findByField("marks", "studentId", student._id);
+  const studentAttendance = dataStore.findByField("attendance", "studentId", student._id);
+  const total = studentAttendance.length;
+  const present = studentAttendance.filter(a => a.status === "present" || a.status === "compensated").length;
+  const attendancePercent = total > 0 ? Math.round((present / total) * 100) : 0;
+  res.json({ ...student, marks: studentMarks, attendanceSummary: { total, present, percent: attendancePercent } });
+};
+
+// POST /api/students
+const createStudent = (req, res) => {
+  const { name, rollNo, branch, section, email, contact, dob, semester, gender } = req.body;
+  if (!name || !rollNo) return res.status(400).json({ message: "Name and Roll No are required" });
+  const existing = dataStore.findOne("students", { rollNo });
+  if (existing) return res.status(400).json({ message: "Student with this roll number already exists" });
+  const student = dataStore.insert("students", {
+    name, rollNo, branch: branch || "CSE", section: section || "A",
+    semester: semester || "3", gender: gender || "male",
+    email: email || "", contact: contact || "", dob: dob || "",
+    parentalEducation: "", lunchType: "standard", testPrepStatus: "none",
+    feeStatus: "pending", feeAmount: 75000,
+  });
+  // Also create a user account for this student
+  if (email && dob) {
+    dataStore.insert("users", {
+      name, email: email.toLowerCase(), password: dob, role: "student", dob, studentRef: student._id,
+    });
   }
+  res.status(201).json(student);
 };
 
-// @route GET /api/students/:id
-const getStudentById = async (req, res) => {
-  try {
-    await connectDB();
-    if (mongoose.connection.readyState === 1) {
-      const student = await Student.findById(req.params.id);
-      if (student) return res.json(student);
-    }
-    const found = DEMO_STUDENTS.find((s) => s._id === req.params.id) || DEMO_STUDENTS[0];
-    res.json(found);
-  } catch (err) {
-    res.json(DEMO_STUDENTS[0]);
-  }
+// PUT /api/students/:id
+const updateStudent = (req, res) => {
+  const updated = dataStore.update("students", req.params.id, req.body);
+  if (!updated) return res.status(404).json({ message: "Student not found" });
+  res.json(updated);
 };
 
-// @route PUT /api/students/:id
-const updateStudent = async (req, res) => {
-  try {
-    await connectDB();
-    if (mongoose.connection.readyState === 1) {
-      const student = await Student.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
-        runValidators: true,
-      });
-      if (student) return res.json(student);
-    }
-    res.json({ _id: req.params.id, ...req.body });
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
+// DELETE /api/students/:id
+const deleteStudent = (req, res) => {
+  const removed = dataStore.remove("students", req.params.id);
+  if (!removed) return res.status(404).json({ message: "Student not found" });
+  res.json({ message: "Student deleted" });
 };
 
-// @route DELETE /api/students/:id
-const deleteStudent = async (req, res) => {
-  try {
-    await connectDB();
-    if (mongoose.connection.readyState === 1) {
-      const student = await Student.findByIdAndDelete(req.params.id);
-      if (student) return res.json({ message: "Student deleted" });
-    }
-    res.json({ message: "Student deleted" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-module.exports = {
-  createStudent,
-  getStudents,
-  getStudentById,
-  updateStudent,
-  deleteStudent,
-};
+module.exports = { getStudents, getStudentById, createStudent, updateStudent, deleteStudent };

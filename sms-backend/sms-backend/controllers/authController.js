@@ -1,114 +1,66 @@
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
-const User = require("../models/User");
-const connectDB = require("../config/db");
+const dataStore = require("../dataStore");
 
-const JWT_SECRET = process.env.JWT_SECRET || "sms_jwt_secret_key_2026";
+const JWT_SECRET = process.env.JWT_SECRET || "campussync_jwt_secret_2026";
+const generateToken = (id, role) => jwt.sign({ id, role }, JWT_SECRET, { expiresIn: "7d" });
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, JWT_SECRET, { expiresIn: "7d" });
-};
+// @route POST /api/auth/login
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+    const cleanEmail = email.toLowerCase().trim();
+    const user = dataStore.findOne("users", { email: cleanEmail });
 
-const DEMO_USERS = {
-  "admin@sms.com": {
-    _id: "669000000000000000000001",
-    name: "Admin User",
-    email: "admin@sms.com",
-    password: "admin123",
-    role: "admin",
-  },
-  "faculty@sms.com": {
-    _id: "669000000000000000000002",
-    name: "Faculty User",
-    email: "faculty@sms.com",
-    password: "faculty123",
-    role: "faculty",
-  },
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // For students: password is DOB (YYYY-MM-DD)
+    // For staff: password is plaintext match
+    if (user.password !== password) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const response = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id, user.role),
+    };
+
+    // If student, include studentRef
+    if (user.role === "student" && user.studentRef) {
+      response.studentRef = user.studentRef;
+    }
+
+    return res.json(response);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
 // @route POST /api/auth/register
 const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-
     if (!name || !email || !password) {
       return res.status(400).json({ message: "Name, email and password are required" });
     }
-
-    await connectDB();
-
-    if (mongoose.connection.readyState === 1) {
-      const userExists = await User.findOne({ email });
-      if (userExists) {
-        return res.status(400).json({ message: "User with this email already exists" });
-      }
-
-      const user = await User.create({ name, email, password, role });
-
-      return res.status(201).json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id),
-      });
-    } else {
-      return res.status(201).json({
-        _id: "demo-new-user-id",
-        name,
-        email,
-        role: role || "student",
-        token: generateToken("demo-new-user-id"),
-      });
+    const existing = dataStore.findOne("users", { email: email.toLowerCase().trim() });
+    if (existing) {
+      return res.status(400).json({ message: "User with this email already exists" });
     }
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// @route POST /api/auth/login
-const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-
-    // 1. Try DB lookup first if MongoDB is connected
-    try {
-      await connectDB();
-      if (mongoose.connection.readyState === 1) {
-        const user = await User.findOne({ email: cleanEmail });
-        if (user && (await user.matchPassword(password))) {
-          return res.json({
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            token: generateToken(user._id),
-          });
-        }
-      }
-    } catch (dbErr) {
-      console.warn("DB login lookup failed, checking demo fallback:", dbErr.message);
-    }
-
-    // 2. Demo fallback accounts
-    const demo = DEMO_USERS[cleanEmail];
-    if (demo && demo.password === password) {
-      return res.json({
-        _id: demo._id,
-        name: demo.name,
-        email: demo.email,
-        role: demo.role,
-        token: generateToken(demo._id),
-      });
-    }
-
-    return res.status(401).json({ message: "Invalid email or password" });
+    const user = dataStore.insert("users", {
+      name, email: email.toLowerCase().trim(), password, role: role || "student", dob: password,
+    });
+    return res.status(201).json({
+      _id: user._id, name: user.name, email: user.email, role: user.role,
+      token: generateToken(user._id, user.role),
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -116,16 +68,18 @@ const login = async (req, res) => {
 
 // @route GET /api/auth/me
 const getMe = async (req, res) => {
-  if (req.user) {
-    return res.json(req.user);
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ message: "Not authenticated" });
+  try {
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = dataStore.findById("users", decoded.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const { password, ...safeUser } = user;
+    return res.json(safeUser);
+  } catch {
+    return res.status(401).json({ message: "Invalid token" });
   }
-
-  return res.json({
-    _id: "669000000000000000000001",
-    name: "Admin User",
-    email: "admin@sms.com",
-    role: "admin",
-  });
 };
 
 module.exports = { register, login, getMe };

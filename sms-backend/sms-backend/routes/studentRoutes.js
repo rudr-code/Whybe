@@ -16,9 +16,9 @@ router.use(protect);
 router.get("/", getStudents);
 router.get("/:id", getStudentById);
 
-// Only admin/faculty can create, edit, or delete records
-router.post("/", authorize("admin", "faculty"), createStudent);
-router.put("/:id", authorize("admin", "faculty"), updateStudent);
+// Only admin/faculty/ta can create or edit records
+router.post("/", authorize("admin", "faculty", "ta"), createStudent);
+router.put("/:id", authorize("admin", "faculty", "ta"), updateStudent);
 router.delete("/:id", authorize("admin"), deleteStudent);
 
 module.exports = router;

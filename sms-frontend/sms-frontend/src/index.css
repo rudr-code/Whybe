@@ -2,32 +2,108 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  -webkit-font-smoothing: antialiased;
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  h1, h2, h3, h4 { @apply font-heading; }
+  ::selection { @apply bg-emerald/20 text-ink; }
 }
 
-body {
-  background-color: #f7f6f3;
-  color: #1f2430;
+@layer components {
+  /* Chips / Badges */
+  .chip {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full;
+  }
+  .chip-paid { @apply bg-emerald-50 text-emerald-dark; }
+  .chip-pending { @apply bg-amber-50 text-amber-700; }
+  .chip-overdue { @apply bg-crimson-50 text-crimson; }
+  .chip-info { @apply bg-platinum-100 text-slate; }
+
+  /* Glass Card */
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-platinum-200 rounded-xl shadow-sm;
+  }
+
+  /* Stat Card */
+  .stat-card {
+    @apply bg-white border border-platinum-200 rounded-xl px-6 py-5 transition-all duration-200;
+  }
+  .stat-card:hover {
+    @apply shadow-md border-emerald/30;
+  }
+
+  /* Button variants */
+  .btn-primary {
+    @apply bg-emerald hover:bg-emerald-dark text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+  }
+  .btn-danger {
+    @apply bg-crimson hover:bg-crimson-dark text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply bg-transparent hover:bg-platinum-100 text-ink text-sm font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+  .btn-outline {
+    @apply bg-transparent border border-platinum-300 hover:border-emerald text-ink text-sm font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+
+  /* Input */
+  .input-field {
+    @apply w-full border border-platinum-300 rounded-lg px-3.5 py-2.5 text-sm focus:border-emerald focus:ring-1 focus:ring-emerald/30 outline-none transition-all bg-white;
+  }
+
+  /* Table */
+  .table-container {
+    @apply bg-white border border-platinum-200 rounded-xl overflow-hidden shadow-sm;
+  }
+  .table-header {
+    @apply border-b border-platinum-200 text-left text-xs text-slate uppercase tracking-wider;
+  }
+  .table-row {
+    @apply border-b border-platinum-100 last:border-0 hover:bg-emerald-50/30 transition-colors;
+  }
+
+  /* Sidebar */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-platinum-400 hover:text-white hover:bg-white/10 transition-all duration-200;
+  }
+  .sidebar-link.active {
+    @apply text-white bg-emerald/20 border-l-2 border-emerald;
+  }
+
+  /* Modal overlay */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in;
+  }
+  .modal-content {
+    @apply bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto animate-slide-up;
+  }
+
+  /* Page wrapper */
+  .page-wrapper {
+    @apply p-6 md:p-8 max-w-7xl animate-fade-in;
+  }
+  .page-title {
+    @apply font-heading text-2xl md:text-3xl font-bold text-ink mb-1;
+  }
+  .page-subtitle {
+    @apply text-sm text-slate mb-6;
+  }
+
+  /* Section card */
+  .section-card {
+    @apply bg-white border border-platinum-200 rounded-xl p-6 shadow-sm;
+  }
 }
 
-:focus-visible {
-  outline: 2px solid #f5a623;
-  outline-offset: 2px;
-}
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-platinum-300 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-platinum-400; }
 
-/* status chips */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.chip-paid { background: #dcfce7; color: #166534; }
-.chip-pending { background: #fef3c7; color: #92400e; }
-.chip-overdue { background: #fee2e2; color: #991b1b; }
-.chip-present { background: #dcfce7; color: #166534; }
-.chip-absent { background: #fee2e2; color: #991b1b; }
+/* Amber colors for warn chips (Tailwind doesn't have these by default) */
+.bg-amber-50 { background-color: #FFFBEB; }
+.text-amber-700 { color: #B45309; }

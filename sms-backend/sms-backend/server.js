@@ -11,6 +11,7 @@ const app = express();
 
 // Middleware
 app.use(cors());
+app.options("*", cors());
 app.use(express.json());
 
 // Trigger DB connection attempt on request
@@ -28,18 +29,27 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", message: "SMS backend is running" });
 });
 
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", message: "SMS backend is running" });
+});
+
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "SMS backend is running" });
 });
 
-// Routes
+// Routes (mounted with and without /api prefix for Vercel serverless compatibility)
 app.use("/api/auth", authRoutes);
+app.use("/auth", authRoutes);
+
 app.use("/api/students", studentRoutes);
+app.use("/students", studentRoutes);
+
 app.use("/api/attendance", attendanceRoutes);
+app.use("/attendance", attendanceRoutes);
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+  res.status(404).json({ message: "Route not found", path: req.url });
 });
 
 // Global error handler

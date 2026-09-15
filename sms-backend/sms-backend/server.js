@@ -13,7 +13,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Trigger DB connection attempt on request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+  } catch (e) {
+    // Continue even if DB connection fails
+  }
+  next();
+});
+
 // Health check — hit this first to confirm the server is alive
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", message: "SMS backend is running" });
+});
+
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "SMS backend is running" });
 });
@@ -28,14 +42,15 @@ app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Global error handler (catches thrown errors from async routes)
+// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Something went wrong", error: err.message });
 });
 
-const PORT = process.env.PORT || 5000;
-
-connectDB().then(() => {
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-});
+}
+
+module.exports = app;

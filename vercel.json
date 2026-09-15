@@ -3,6 +3,10 @@
   "outputDirectory": "sms-frontend/sms-frontend/dist",
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

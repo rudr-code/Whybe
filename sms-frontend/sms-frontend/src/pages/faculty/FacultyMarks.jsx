@@ -20,10 +20,10 @@ export default function FacultyMarks() {
     loadSubjects();
   }, []);
 
-  const fetchMarks = async (isBackground = false) => {
+  const fetchMarks = async () => {
     if (!selectedSubjectId) return;
     try {
-      if (!isBackground) setLoading(true);
+      setLoading(true);
       const { data } = await api.get(`/marks/subject/${selectedSubjectId}`, {
         params: { limit: 50 },
       });
@@ -31,31 +31,12 @@ export default function FacultyMarks() {
     } catch (err) {
       console.error("Failed to fetch marks", err);
     } finally {
-      if (!isBackground) setLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMarks(false);
-
-    // Dynamic short-interval polling (every 6 seconds)
-    const interval = setInterval(() => {
-      fetchMarks(true);
-    }, 6000);
-
-    const onFocus = () => {
-      if (document.visibilityState === "visible") {
-        fetchMarks(true);
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
+    fetchMarks();
   }, [selectedSubjectId]);
 
   const selectedSubj = subjects.find((s) => s._id === selectedSubjectId);

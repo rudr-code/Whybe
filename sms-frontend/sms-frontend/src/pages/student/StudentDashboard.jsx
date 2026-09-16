@@ -16,13 +16,13 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadData(isBackground = false) {
+    async function loadData() {
       try {
-        if (!isBackground) setLoading(true);
+        setLoading(true);
+        // Student ID: user.studentRef or fallback to student-0001
         const sId = user?.studentRef || "student-0001";
 
+        // Fetch student profile & aggregated data
         const [studentRes, attRes, marksRes, ttRes, messRes] = await Promise.allSettled([
           api.get(`/students/${sId}`),
           api.get(`/attendance/${sId}`),
@@ -31,40 +31,18 @@ export default function StudentDashboard() {
           api.get("/mess-menu"),
         ]);
 
-        if (isMounted) {
-          if (studentRes.status === "fulfilled") setStudentData(studentRes.value.data);
-          if (attRes.status === "fulfilled") setAttendance(attRes.value.data);
-          if (marksRes.status === "fulfilled") setMarks(marksRes.value.data);
-          if (ttRes.status === "fulfilled") setTimetable(ttRes.value.data);
-          if (messRes.status === "fulfilled") setMessMenu(messRes.value.data);
-        }
+        if (studentRes.status === "fulfilled") setStudentData(studentRes.value.data);
+        if (attRes.status === "fulfilled") setAttendance(attRes.value.data);
+        if (marksRes.status === "fulfilled") setMarks(marksRes.value.data);
+        if (ttRes.status === "fulfilled") setTimetable(ttRes.value.data);
+        if (messRes.status === "fulfilled") setMessMenu(messRes.value.data);
       } catch (err) {
         console.error("Error loading student dashboard:", err);
       } finally {
-        if (isMounted && !isBackground) setLoading(false);
+        setLoading(false);
       }
     }
-
-    loadData(false);
-
-    const interval = setInterval(() => {
-      loadData(true);
-    }, 8000);
-
-    const onFocus = () => {
-      if (document.visibilityState === "visible") {
-        loadData(true);
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
+    loadData();
   }, [user]);
 
   const attPercent = attendance?.overall?.percent ?? 88;

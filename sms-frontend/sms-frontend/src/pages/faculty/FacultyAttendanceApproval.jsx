@@ -8,38 +8,20 @@ export default function FacultyAttendanceApproval() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState("");
 
-  const fetchRequests = async (isBackground = false) => {
+  const fetchRequests = async () => {
     try {
-      if (!isBackground) setLoading(true);
+      setLoading(true);
       const { data } = await api.get("/attendance-requests");
       setRequests(data);
     } catch (err) {
       console.error("Failed to load requests", err);
     } finally {
-      if (!isBackground) setLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRequests(false);
-
-    const interval = setInterval(() => {
-      fetchRequests(true);
-    }, 6000);
-
-    const onFocus = () => {
-      if (document.visibilityState === "visible") {
-        fetchRequests(true);
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
+    fetchRequests();
   }, []);
 
   const handleDecision = async (id, action) => {

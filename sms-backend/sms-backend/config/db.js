@@ -1,45 +1,26 @@
 const mongoose = require("mongoose");
 
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
-}
+let isConnected = 0;
 
 const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
-
-  if (!uri) {
-    throw new Error("Neither MONGODB_URI nor MONGO_URI is configured in environment variables.");
+  if (isConnected === 1) {
+    return;
   }
 
-  if (cached.conn && mongoose.connection.readyState === 1) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 8000,
-      autoIndex: true,
-    };
-
-    cached.promise = mongoose.connect(uri, opts).then((mongooseInstance) => {
-      console.log(`MongoDB connected: ${mongooseInstance.connection.host}`);
-      return mongooseInstance;
-    });
+  if (!process.env.MONGO_URI) {
+    console.warn("MONGO_URI not specified. Running in demo mode.");
+    return;
   }
 
   try {
-    cached.conn = await cached.promise;
-    return cached.conn;
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    isConnected = conn.connections[0].readyState;
+    console.log(`MongoDB connected: ${conn.connection.host}`);
   } catch (err) {
-    cached.promise = null;
-    cached.conn = null;
-    console.error(`MongoDB connection failed: ${err.message}`);
-    throw err;
+    console.error(`DB connection failed: ${err.message}`);
   }
 };
 
 module.exports = connectDB;
-

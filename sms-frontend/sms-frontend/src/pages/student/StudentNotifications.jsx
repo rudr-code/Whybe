@@ -23,9 +23,9 @@ export default function StudentNotifications() {
   const [sendingMsg, setSendingMsg] = useState(false);
   const [msgFeedback, setMsgFeedback] = useState("");
 
-  const fetchData = async (isBackground = false) => {
+  const fetchData = async () => {
     try {
-      if (!isBackground) setLoading(true);
+      setLoading(true);
       const sId = user?.studentRef || "student-0001";
 
       const [notifRes, reqRes] = await Promise.allSettled([
@@ -38,30 +38,12 @@ export default function StudentNotifications() {
     } catch (err) {
       console.error("Failed to load student notifications", err);
     } finally {
-      if (!isBackground) setLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData(false);
-
-    const interval = setInterval(() => {
-      fetchData(true);
-    }, 6000);
-
-    const onFocus = () => {
-      if (document.visibilityState === "visible") {
-        fetchData(true);
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
+    fetchData();
   }, [user]);
 
   const handleMarkRead = async (id) => {

@@ -7,42 +7,20 @@ export default function StudentTimetable() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function fetchTimetable(isBackground = false) {
+    async function fetchTimetable() {
       try {
-        if (!isBackground) setLoading(true);
+        setLoading(true);
         const { data } = await api.get("/timetable", {
           params: { branch: "CSE", section: "A" },
         });
-        if (isMounted) setTimetable(data);
+        setTimetable(data);
       } catch (err) {
         console.error("Failed to load timetable", err);
       } finally {
-        if (isMounted && !isBackground) setLoading(false);
+        setLoading(false);
       }
     }
-
-    fetchTimetable(false);
-
-    const interval = setInterval(() => {
-      fetchTimetable(true);
-    }, 10000);
-
-    const onFocus = () => {
-      if (document.visibilityState === "visible") {
-        fetchTimetable(true);
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
+    fetchTimetable();
   }, []);
 
   return (

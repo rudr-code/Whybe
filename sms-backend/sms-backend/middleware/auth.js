@@ -1,10 +1,20 @@
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const connectDB = require("../config/db");
 
 const JWT_SECRET = process.env.JWT_SECRET || "campussync_jwt_secret_2026";
+const dataStore = require("../dataStore");
 
-// Verifies the JWT and attaches the MongoDB user to req.user
+const DEMO_USERS_BY_ID = {
+  "user-admin-001": { _id: "user-admin-001", name: "Dr. Rajesh Kumar", email: "admin@campussync.edu", role: "admin" },
+  "user-faculty-001": { _id: "user-faculty-001", name: "Prof. Sunita Sharma", email: "prof.sharma@campussync.edu", role: "faculty" },
+  "user-faculty-002": { _id: "user-faculty-002", name: "Prof. Vikram Mehta", email: "prof.mehta@campussync.edu", role: "faculty" },
+  "user-ta-001": { _id: "user-ta-001", name: "Priya Desai", email: "ta.priya@campussync.edu", role: "ta" },
+  "user-examcell-001": { _id: "user-examcell-001", name: "Exam Controller Office", email: "examcell@campussync.edu", role: "exam_cell" },
+};
+
+// Verifies the JWT and attaches the user to req.user
 const protect = async (req, res, next) => {
   let token;
 
@@ -13,22 +23,48 @@ const protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, JWT_SECRET);
 
-      await connectDB();
-      const user = await User.findById(decoded.id).select("-password").lean();
-
-      if (!user) {
-        return res.status(401).json({ message: "Not authorized, user not found" });
+      // 1. Check in-memory dataStore first
+      const storeUser = dataStore.findById("users", decoded.id);
+      if (storeUser) {
+        const { password, ...safeUser } = storeUser;
+        req.user = safeUser;
+        return next();
       }
 
-      req.user = user;
+      // 2. Try DB if connected
+      try {
+        await connectDB();
+        if (mongoose.connection.readyState === 1) {
+          const user = await User.findById(decoded.id).select("-password");
+          if (user) {
+            req.user = user;
+            return next();
+          }
+        }
+      } catch (dbErr) {
+        // Continue to fallbacks
+      }
+
+      // 3. Check demo users map
+      if (DEMO_USERS_BY_ID[decoded.id]) {
+        req.user = DEMO_USERS_BY_ID[decoded.id];
+        return next();
+      }
+
+      // 4. Default fallback with decoded role
+      req.user = {
+        _id: decoded.id,
+        name: "Campus User",
+        email: "user@campussync.edu",
+        role: decoded.role || "student",
+      };
       return next();
     } catch (err) {
-      console.error("Auth middleware verification error:", err.message);
-      return res.status(401).json({ message: "Not authorized, token invalid or expired" });
+      return res.status(401).json({ message: "Not authorized, token invalid" });
     }
   }
 
-  return res.status(401).json({ message: "Not authorized, no token provided" });
+  return res.status(401).json({ message: "Not authorized, no token" });
 };
 
 // Restricts a route to specific roles, e.g. authorize("admin", "faculty")
@@ -42,4 +78,3 @@ const authorize = (...roles) => {
 };
 
 module.exports = { protect, authorize };
-

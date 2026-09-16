@@ -1,9 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const mongoose = require("mongoose");
 const connectDB = require("./config/db");
-const { seedDatabase } = require("./utils/seedData");
 
 const authRoutes = require("./routes/authRoutes");
 const studentRoutes = require("./routes/studentRoutes");
@@ -21,69 +19,32 @@ const app = express();
 app.use(cors({
   origin: process.env.CORS_ORIGIN || '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.options('*', cors({ origin: process.env.CORS_ORIGIN || '*' }));
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json());
 
-// Prevent caching on all dynamic API endpoints
-app.use((req, res, next) => {
-  res.set({
-    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0",
-    "Surrogate-Control": "no-store",
-  });
+// Trigger DB connection attempt on request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+  } catch (e) {
+    // Continue even if DB connection fails
+  }
   next();
 });
 
-let seedingPromise = null;
-
-// Connect DB on each request (production-safe serverless cached connection)
-app.use(async (req, res, next) => {
-  // Allow simple ping without DB requirement
-  const path = req.path || req.url || "";
-  if (path === "/health" || path === "/api/health" || path === "/") {
-    return next();
-  }
-
-  try {
-    await connectDB();
-
-    // One-time automatic baseline seed if database is empty
-    if (!seedingPromise && mongoose.connection.readyState === 1) {
-      seedingPromise = seedDatabase(false).catch((err) => {
-        console.error("Auto-seed error:", err.message);
-      });
-    }
-    next();
-  } catch (err) {
-    console.error("Database connection failure:", err.message);
-    return res.status(503).json({
-      message: "Database unavailable. Please verify MONGO_URI / MONGODB_URI configuration.",
-      error: err.message,
-    });
-  }
+// Health checks
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", message: "CampusSync backend is running" });
 });
 
-// Health checks
-app.get(["/api/health", "/health", "/"], async (req, res) => {
-  let dbStatus = "disconnected";
-  try {
-    if (process.env.MONGODB_URI || process.env.MONGO_URI) {
-      await connectDB();
-      dbStatus = mongoose.connection.readyState === 1 ? "connected" : "connecting";
-    }
-  } catch (e) {
-    dbStatus = "error: " + e.message;
-  }
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", message: "CampusSync backend is running" });
+});
 
-  res.json({
-    status: "ok",
-    message: "Whybe CampusSync backend is running",
-    database: dbStatus,
-    timestamp: new Date().toISOString(),
-  });
+app.get("/", (req, res) => {
+  res.json({ status: "ok", message: "CampusSync backend is running" });
 });
 
 // Routes
@@ -106,8 +67,8 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err.stack || err);
-  res.status(500).json({ message: "Internal server error", error: err.message });
+  console.error(err.stack);
+  res.status(500).json({ message: "Something went wrong", error: err.message });
 });
 
 if (require.main === module) {
@@ -116,4 +77,3 @@ if (require.main === module) {
 }
 
 module.exports = app;
-

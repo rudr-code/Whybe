@@ -16,40 +16,21 @@ export default function StudentAttendance() {
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState("");
 
-  const fetchAttendance = async (isBackground = false) => {
+  const fetchAttendance = async () => {
     try {
-      if (!isBackground) setLoading(true);
+      setLoading(true);
       const sId = user?.studentRef || "student-0001";
       const { data } = await api.get(`/attendance/${sId}`);
       setAttendance(data);
     } catch (err) {
       console.error("Failed to load attendance", err);
     } finally {
-      if (!isBackground) setLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAttendance(false);
-
-    // Dynamic short-interval polling (every 8 seconds)
-    const interval = setInterval(() => {
-      fetchAttendance(true);
-    }, 8000);
-
-    const onFocus = () => {
-      if (document.visibilityState === "visible") {
-        fetchAttendance(true);
-      }
-    };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
+    fetchAttendance();
   }, [user]);
 
   const handleCompensationSubmit = async (e) => {

@@ -89,8 +89,7 @@ export default function TAMarksEntry() {
           })
         )
       );
-      setSaveMessage("All marks have been successfully saved and synced to student transcripts in MongoDB!");
-      await loadMarks();
+      setSaveMessage("All marks have been successfully saved and synced to student transcripts!");
     } catch (err) {
       setSaveMessage("Error saving marks: " + (err.response?.data?.message || err.message));
     } finally {

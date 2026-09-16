@@ -1,78 +1,6 @@
-const dataStore = require("../dataStore");
-
-// GET /api/marks?studentId=&subjectId=&semester=
-const getMarks = (req, res) => {
-  const { studentId, subjectId, semester } = req.query;
-  let result = [...dataStore.marks];
-  if (studentId) result = result.filter(m => m.studentId === studentId);
-  if (subjectId) result = result.filter(m => m.subjectId === subjectId);
-  if (semester) result = result.filter(m => m.semester === semester);
-  res.json(result);
-};
-
-// GET /api/marks/student/:studentId
-const getStudentMarks = (req, res) => {
-  const result = dataStore.findByField("marks", "studentId", req.params.studentId);
-  res.json(result);
-};
-
-// GET /api/marks/subject/:subjectId — all students' marks for a subject
-const getSubjectMarks = (req, res) => {
-  const { page = 1, limit = 50 } = req.query;
-  const all = dataStore.findByField("marks", "subjectId", req.params.subjectId);
-  // Enrich with student info
-  const enriched = all.map(m => {
-    const student = dataStore.findById("students", m.studentId);
-    return { ...m, studentName: student?.name, rollNo: student?.rollNo, branch: student?.branch, section: student?.section };
-  });
-  const start = (parseInt(page) - 1) * parseInt(limit);
-  const paginated = enriched.slice(start, start + parseInt(limit));
-  res.json({ marks: paginated, total: enriched.length, page: parseInt(page), totalPages: Math.ceil(enriched.length / parseInt(limit)) });
-};
-
-// POST /api/marks — create or update marks
-const upsertMarks = (req, res) => {
-  const { studentId, subjectId, midSem1, midSem2, endSem, internal, semester } = req.body;
-  if (!studentId || !subjectId) return res.status(400).json({ message: "studentId and subjectId are required" });
-
-  const existing = dataStore.marks.find(m => m.studentId === studentId && m.subjectId === subjectId);
-  const subj = dataStore.findById("subjects", subjectId);
-  const total = (midSem1 || 0) + (midSem2 || 0) + (endSem || 0) + (internal || 0);
-  const grade = calcGrade(total);
-
-  if (existing) {
-    const updated = dataStore.update("marks", existing._id, {
-      midSem1: midSem1 ?? existing.midSem1, midSem2: midSem2 ?? existing.midSem2,
-      endSem: endSem ?? existing.endSem, internal: internal ?? existing.internal,
-      total, grade, semester: semester || existing.semester,
-    });
-    return res.json(updated);
-  }
-
-  const mark = dataStore.insert("marks", {
-    studentId, subjectId, subjectCode: subj?.code || "", subjectName: subj?.name || "",
-    midSem1: midSem1 || 0, midSem2: midSem2 || 0, endSem: endSem || 0, internal: internal || 0,
-    total, grade, semester: semester || "3",
-  });
-  res.status(201).json(mark);
-};
-
-// PUT /api/marks/:id — update specific marks record
-const updateMarks = (req, res) => {
-  const existing = dataStore.findById("marks", req.params.id);
-  if (!existing) return res.status(404).json({ message: "Marks record not found" });
-
-  const midSem1 = req.body.midSem1 ?? existing.midSem1;
-  const midSem2 = req.body.midSem2 ?? existing.midSem2;
-  const endSem = req.body.endSem ?? existing.endSem;
-  const internal = req.body.internal ?? existing.internal;
-  const total = midSem1 + midSem2 + endSem + internal;
-
-  const updated = dataStore.update("marks", req.params.id, {
-    ...req.body, midSem1, midSem2, endSem, internal, total, grade: calcGrade(total),
-  });
-  res.json(updated);
-};
+const Marks = require("../models/Marks");
+const Student = require("../models/Student");
+const Subject = require("../models/Subject");
 
 function calcGrade(total) {
   if (total >= 90) return "A+";
@@ -85,4 +13,153 @@ function calcGrade(total) {
   return "F";
 }
 
+// GET /api/marks?studentId=&subjectId=&semester=
+const getMarks = async (req, res) => {
+  try {
+    const { studentId, subjectId, semester } = req.query;
+    const filter = {};
+    if (studentId) filter.studentId = studentId;
+    if (subjectId) filter.subjectId = subjectId;
+    if (semester) filter.semester = semester;
+    const result = await Marks.find(filter).lean();
+    return res.json(result);
+  } catch (err) {
+    console.error("Error in getMarks:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/marks/student/:studentId
+const getStudentMarks = async (req, res) => {
+  try {
+    const result = await Marks.find({ studentId: req.params.studentId }).lean();
+    return res.json(result);
+  } catch (err) {
+    console.error("Error in getStudentMarks:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/marks/subject/:subjectId — all students' marks for a subject
+const getSubjectMarks = async (req, res) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 50;
+    const query = { subjectId: req.params.subjectId };
+
+    const total = await Marks.countDocuments(query);
+    const marksList = await Marks.find(query)
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum)
+      .lean();
+
+    // Enrich with student information
+    const studentIds = marksList.map((m) => m.studentId);
+    const students = await Student.find({ _id: { $in: studentIds } }).lean();
+    const studentMap = new Map(students.map((s) => [s._id, s]));
+
+    const enriched = marksList.map((m) => {
+      const student = studentMap.get(m.studentId);
+      return {
+        ...m,
+        studentName: student?.name || "Student",
+        rollNo: student?.rollNo || "",
+        branch: student?.branch || "",
+        section: student?.section || "",
+      };
+    });
+
+    return res.json({
+      marks: enriched,
+      total,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
+    });
+  } catch (err) {
+    console.error("Error in getSubjectMarks:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/marks — create or update marks
+const upsertMarks = async (req, res) => {
+  try {
+    const { studentId, subjectId, midSem1, midSem2, endSem, internal, semester } = req.body;
+    if (!studentId || !subjectId) {
+      return res.status(400).json({ message: "studentId and subjectId are required" });
+    }
+
+    const existing = await Marks.findOne({ studentId, subjectId });
+    const subj = await Subject.findById(subjectId).lean();
+
+    const m1 = midSem1 !== undefined ? Number(midSem1) : existing ? existing.midSem1 : 0;
+    const m2 = midSem2 !== undefined ? Number(midSem2) : existing ? existing.midSem2 : 0;
+    const end = endSem !== undefined ? Number(endSem) : existing ? existing.endSem : 0;
+    const intern = internal !== undefined ? Number(internal) : existing ? existing.internal : 0;
+    const total = m1 + m2 + end + intern;
+    const grade = calcGrade(total);
+
+    const markData = {
+      studentId,
+      subjectId,
+      subjectCode: subj?.code || existing?.subjectCode || "",
+      subjectName: subj?.name || existing?.subjectName || "",
+      midSem1: m1,
+      midSem2: m2,
+      endSem: end,
+      internal: intern,
+      total,
+      grade,
+      semester: semester || existing?.semester || "3",
+    };
+
+    const mark = await Marks.findOneAndUpdate(
+      { studentId, subjectId },
+      { $set: markData },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.status(200).json(mark);
+  } catch (err) {
+    console.error("Error in upsertMarks:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/marks/:id — update specific marks record
+const updateMarks = async (req, res) => {
+  try {
+    const existing = await Marks.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Marks record not found" });
+
+    const midSem1 = req.body.midSem1 !== undefined ? Number(req.body.midSem1) : existing.midSem1;
+    const midSem2 = req.body.midSem2 !== undefined ? Number(req.body.midSem2) : existing.midSem2;
+    const endSem = req.body.endSem !== undefined ? Number(req.body.endSem) : existing.endSem;
+    const internal = req.body.internal !== undefined ? Number(req.body.internal) : existing.internal;
+    const total = midSem1 + midSem2 + endSem + internal;
+    const grade = calcGrade(total);
+
+    const updated = await Marks.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...req.body,
+        midSem1,
+        midSem2,
+        endSem,
+        internal,
+        total,
+        grade,
+      },
+      { new: true }
+    );
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("Error in updateMarks:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = { getMarks, getStudentMarks, getSubjectMarks, upsertMarks, updateMarks };
+

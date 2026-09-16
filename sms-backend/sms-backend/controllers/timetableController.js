@@ -1,44 +1,99 @@
-const dataStore = require("../dataStore");
+const Timetable = require("../models/Timetable");
+const Subject = require("../models/Subject");
 
 // GET /api/timetable?branch=&section=&semester=
-const getTimetable = (req, res) => {
-  const { branch, section, semester, day } = req.query;
-  let result = [...dataStore.timetable];
-  if (branch) result = result.filter(t => t.branch === branch);
-  if (section) result = result.filter(t => t.section === section);
-  if (semester) result = result.filter(t => t.semester === semester);
-  if (day) result = result.filter(t => t.day === day);
-  // Sort by day order then period
-  const dayOrder = { Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7 };
-  result.sort((a, b) => (dayOrder[a.day] - dayOrder[b.day]) || (a.period - b.period));
-  res.json(result);
+const getTimetable = async (req, res) => {
+  try {
+    const { branch, section, semester, day } = req.query;
+    const filter = {};
+    if (branch) filter.branch = branch;
+    if (section) filter.section = section;
+    if (semester) filter.semester = semester;
+    if (day) filter.day = day;
+
+    const result = await Timetable.find(filter).lean();
+
+    const dayOrder = {
+      Monday: 1,
+      Tuesday: 2,
+      Wednesday: 3,
+      Thursday: 4,
+      Friday: 5,
+      Saturday: 6,
+      Sunday: 7,
+    };
+
+    result.sort((a, b) => (dayOrder[a.day] - dayOrder[b.day]) || (a.period - b.period));
+    return res.json(result);
+  } catch (err) {
+    console.error("Error in getTimetable:", err);
+    return res.status(500).json({ message: err.message });
+  }
 };
 
 // PUT /api/timetable/:id
-const updateTimetableEntry = (req, res) => {
-  const updated = dataStore.update("timetable", req.params.id, req.body);
-  if (!updated) return res.status(404).json({ message: "Timetable entry not found" });
-  res.json(updated);
+const updateTimetableEntry = async (req, res) => {
+  try {
+    const updated = await Timetable.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    }).lean();
+    if (!updated) return res.status(404).json({ message: "Timetable entry not found" });
+    return res.json(updated);
+  } catch (err) {
+    console.error("Error in updateTimetableEntry:", err);
+    return res.status(500).json({ message: err.message });
+  }
 };
 
 // POST /api/timetable
-const createTimetableEntry = (req, res) => {
-  const { branch, section, semester, day, period, subjectId, room, facultyId } = req.body;
-  if (!branch || !day || !period) return res.status(400).json({ message: "Branch, day, and period are required" });
-  const subj = dataStore.findById("subjects", subjectId);
-  const entry = dataStore.insert("timetable", {
-    branch, section: section || "A", semester: semester || "3", day, period,
-    subjectId: subjectId || null, subjectCode: subj?.code || "", subjectName: subj?.name || "",
-    room: room || "", facultyId: facultyId || null,
-  });
-  res.status(201).json(entry);
+const createTimetableEntry = async (req, res) => {
+  try {
+    const { branch, section, semester, day, period, subjectId, room, facultyId } = req.body;
+    if (!branch || !day || !period) {
+      return res.status(400).json({ message: "Branch, day, and period are required" });
+    }
+
+    let subjectCode = "";
+    let subjectName = "";
+    if (subjectId) {
+      const subj = await Subject.findById(subjectId).lean();
+      if (subj) {
+        subjectCode = subj.code;
+        subjectName = subj.name;
+      }
+    }
+
+    const entry = await Timetable.create({
+      branch,
+      section: section || "A",
+      semester: semester || "3",
+      day,
+      period: Number(period),
+      subjectId: subjectId || null,
+      subjectCode,
+      subjectName,
+      room: room || "",
+      facultyId: facultyId || null,
+    });
+
+    return res.status(201).json(entry);
+  } catch (err) {
+    console.error("Error in createTimetableEntry:", err);
+    return res.status(500).json({ message: err.message });
+  }
 };
 
 // DELETE /api/timetable/:id
-const deleteTimetableEntry = (req, res) => {
-  const removed = dataStore.remove("timetable", req.params.id);
-  if (!removed) return res.status(404).json({ message: "Timetable entry not found" });
-  res.json({ message: "Timetable entry deleted" });
+const deleteTimetableEntry = async (req, res) => {
+  try {
+    const removed = await Timetable.findByIdAndDelete(req.params.id);
+    if (!removed) return res.status(404).json({ message: "Timetable entry not found" });
+    return res.json({ message: "Timetable entry deleted" });
+  } catch (err) {
+    console.error("Error in deleteTimetableEntry:", err);
+    return res.status(500).json({ message: err.message });
+  }
 };
 
 module.exports = { getTimetable, updateTimetableEntry, createTimetableEntry, deleteTimetableEntry };
+

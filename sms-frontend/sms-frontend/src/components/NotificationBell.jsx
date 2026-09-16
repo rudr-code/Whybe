@@ -18,20 +18,28 @@ export default function NotificationBell() {
       setNotifications(data.slice(0, 5));
       const unread = data.filter((n) => !n.isRead).length;
       setUnreadCount(unread);
-    } catch {
-      // Offline / fallback mock notifications
-      setNotifications([
-        { _id: "m1", title: "Semester 3 Timetable Released", message: "Classes schedule is updated for all sections.", isRead: false, createdAt: new Date().toISOString() },
-        { _id: "m2", title: "Mid-Sem Marks Announced", message: "Check your mathematics marks sheet.", isRead: true, createdAt: new Date().toISOString() },
-      ]);
-      setUnreadCount(1);
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
     }
   };
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchNotifications, 8000);
+
+    const onFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [user]);
 
   useEffect(() => {

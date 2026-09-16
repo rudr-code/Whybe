@@ -121,24 +121,6 @@ export const AuthProvider = ({ children }) => {
       setUser(data);
       return data;
     } catch (apiErr) {
-      // 3. Fallback to client-side demo users if backend is unreachable or local
-      const demo = DEMO_USERS[cleanEmail];
-      if (demo && demo.password === password) {
-        const demoData = {
-          _id: demo._id,
-          name: demo.name,
-          email: demo.email,
-          role: demo.role,
-          studentRef: demo.studentRef,
-          dob: demo.dob,
-          token: "demo_jwt_token_" + demo.role,
-        };
-        localStorage.setItem("sms_token", demoData.token);
-        localStorage.setItem("sms_user", JSON.stringify(demoData));
-        setUser(demoData);
-        return demoData;
-      }
-
       const errMsg =
         apiErr.response?.data?.message ||
         (apiErr.message ? `Login error: ${apiErr.message}` : "Invalid email or password");

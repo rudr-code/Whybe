@@ -1,20 +1,36 @@
-const dataStore = require("../dataStore");
+const MessMenu = require("../models/MessMenu");
 
 // GET /api/mess-menu
-const getMessMenu = (req, res) => {
-  const { day } = req.query;
-  if (day) {
-    const menu = dataStore.messMenu.find(m => m.day.toLowerCase() === day.toLowerCase());
-    return res.json(menu || {});
+const getMessMenu = async (req, res) => {
+  try {
+    const { day } = req.query;
+    if (day) {
+      const menu = await MessMenu.findOne({
+        day: new RegExp(`^${day.trim()}$`, "i"),
+      }).lean();
+      return res.json(menu || {});
+    }
+    const menus = await MessMenu.find().lean();
+    return res.json(menus);
+  } catch (err) {
+    console.error("Error in getMessMenu:", err);
+    return res.status(500).json({ message: err.message });
   }
-  res.json(dataStore.messMenu);
 };
 
 // PUT /api/mess-menu/:id
-const updateMessMenu = (req, res) => {
-  const updated = dataStore.update("messMenu", req.params.id, req.body);
-  if (!updated) return res.status(404).json({ message: "Menu entry not found" });
-  res.json(updated);
+const updateMessMenu = async (req, res) => {
+  try {
+    const updated = await MessMenu.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    }).lean();
+    if (!updated) return res.status(404).json({ message: "Menu entry not found" });
+    return res.json(updated);
+  } catch (err) {
+    console.error("Error in updateMessMenu:", err);
+    return res.status(500).json({ message: err.message });
+  }
 };
 
 module.exports = { getMessMenu, updateMessMenu };
+

@@ -2,22 +2,22 @@ const mongoose = require("mongoose");
 
 const attendanceSchema = new mongoose.Schema(
   {
-    studentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",
-      required: true,
-    },
-    date: { type: Date, required: true, default: Date.now },
+    _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+    studentId: { type: String, required: true, index: true },
+    subjectId: { type: String, default: null, index: true },
+    date: { type: String, required: true, index: true },
     status: {
       type: String,
-      enum: ["present", "absent"],
+      enum: ["present", "absent", "compensated"],
       required: true,
     },
+    compensationReason: { type: String, default: null },
+    approvedBy: { type: String, default: null },
   },
   { timestamps: true }
 );
 
-// Prevent marking attendance twice for the same student on the same day
-attendanceSchema.index({ studentId: 1, date: 1 }, { unique: false });
+attendanceSchema.index({ studentId: 1, date: 1, subjectId: 1 });
 
 module.exports = mongoose.model("Attendance", attendanceSchema);
+

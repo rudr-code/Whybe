@@ -3,15 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "node sms-backend/sms-backend/server.js",
+    "start": "node sms-backend/sms-backend/server.js",
+    "seed": "node sms-backend/sms-backend/seed.js",
+    "build": "echo 'Root build prepared'"
   },
   "dependencies": {
-    "next": "14.2.35",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.5.0",
     "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
@@ -20,3 +23,4 @@
     "tailwindcss": "^3.4.6"
   }
 }
+

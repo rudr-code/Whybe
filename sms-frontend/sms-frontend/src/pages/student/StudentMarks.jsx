@@ -8,19 +8,43 @@ export default function StudentMarks() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchMarks() {
+    let isMounted = true;
+
+    async function fetchMarks(isBackground = false) {
       try {
-        setLoading(true);
+        if (!isBackground) setLoading(true);
         const sId = user?.studentRef || "student-0001";
         const { data } = await api.get(`/marks/student/${sId}`);
-        setMarks(data);
+        if (isMounted) setMarks(data);
       } catch (err) {
         console.error("Failed to load student marks", err);
       } finally {
-        setLoading(false);
+        if (isMounted && !isBackground) setLoading(false);
       }
     }
-    fetchMarks();
+
+    fetchMarks(false);
+
+    // Dynamic short-interval polling (every 6 seconds)
+    const interval = setInterval(() => {
+      fetchMarks(true);
+    }, 6000);
+
+    // Revalidate immediately on tab focus or visibility change
+    const onFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchMarks(true);
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, [user]);
 
   const avgTotal = marks.length > 0

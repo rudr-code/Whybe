@@ -14,13 +14,16 @@ const api = axios.create({
   baseURL: getBaseURL(),
 });
 
-// Attach the JWT to every request once the user is logged in
+// Attach JWT and no-cache headers to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("sms_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  config.headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+  config.headers["Pragma"] = "no-cache";
   return config;
 });
+
 
 export default api;

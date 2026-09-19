@@ -45,7 +45,7 @@ async function runAuthTests() {
 
   // 1. Valid Admin Login
   const adminRes = await makeRequest("POST", "/api/auth/login", {
-    email: "admin@sms.com",
+    email: "admin@campussync.edu",
     password: "admin123",
   });
   assert.strictEqual(adminRes.statusCode, 200, "Admin login should return HTTP 200");
@@ -55,7 +55,7 @@ async function runAuthTests() {
 
   // 2. Valid Faculty Login
   const facultyRes = await makeRequest("POST", "/api/auth/login", {
-    email: "faculty@sms.com",
+    email: "prof.sharma@campussync.edu",
     password: "faculty123",
   });
   assert.strictEqual(facultyRes.statusCode, 200, "Faculty login should return HTTP 200");
@@ -65,7 +65,7 @@ async function runAuthTests() {
 
   // 3. Invalid Password
   const invalidPassRes = await makeRequest("POST", "/api/auth/login", {
-    email: "admin@sms.com",
+    email: "admin@campussync.edu",
     password: "wrongpassword",
   });
   assert.strictEqual(invalidPassRes.statusCode, 401, "Invalid password should return HTTP 401");
@@ -73,7 +73,7 @@ async function runAuthTests() {
 
   // 4. Invalid Email
   const invalidEmailRes = await makeRequest("POST", "/api/auth/login", {
-    email: "nonexistent@sms.com",
+    email: "nonexistent@campussync.edu",
     password: "admin123",
   });
   assert.strictEqual(invalidEmailRes.statusCode, 401, "Invalid email should return HTTP 401");

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
+import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export default function StudentMarks() {
   const { user } = useAuth();
@@ -8,19 +9,103 @@ export default function StudentMarks() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchMarks() {
+    let isMounted = true;
+    let channel = null;
+    let debounceTimer = null;
+    const sId = user?.studentRef || "student-0001";
+
+    async function loadMarks() {
       try {
-        setLoading(true);
-        const sId = user?.studentRef || "student-0001";
         const { data } = await api.get(`/marks/student/${sId}`);
-        setMarks(data);
+        if (isMounted) {
+          setMarks(data);
+        }
       } catch (err) {
         console.error("Failed to load student marks", err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
-    fetchMarks();
+
+    // Initial fetch via existing API
+    loadMarks();
+
+    const debouncedRefetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (isMounted) {
+          loadMarks();
+        }
+      }, 300);
+    };
+
+    // Realtime subscription setup
+    async function setupRealtime() {
+      if (!isSupabaseConfigured || !supabase) return;
+
+      try {
+        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr || !sessionData?.session?.user?.id) {
+          // No active Supabase session: keep existing fetch behavior
+          return;
+        }
+
+        const authUserId = sessionData.session.user.id;
+
+        // Resolve student UUID via public.students where profile_id = auth user id (relying on RLS)
+        const { data: studentRecord, error: studentErr } = await supabase
+          .from("students")
+          .select("id")
+          .eq("profile_id", authUserId)
+          .maybeSingle();
+
+        if (studentErr || !studentRecord?.id || !isMounted) {
+          // Unable to resolve UUID or unmounted: keep existing fetch behavior
+          return;
+        }
+
+        const channelName = `student-marks-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        channel = supabase
+          .channel(channelName)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "marks",
+              filter: `student_id=eq.${studentRecord.id}`,
+            },
+            () => {
+              debouncedRefetch();
+            }
+          )
+          .subscribe((status) => {
+            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+              if (channel) {
+                supabase.removeChannel(channel);
+                channel = null;
+              }
+            }
+          });
+      } catch (e) {
+        // Fall back silently to existing fetch behavior
+      }
+    }
+
+    setupRealtime();
+
+    return () => {
+      isMounted = false;
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
   }, [user]);
 
   const avgTotal = marks.length > 0

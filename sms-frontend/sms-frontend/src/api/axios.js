@@ -1,4 +1,5 @@
 import axios from "axios";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 const getBaseURL = () => {
   if (import.meta.env.VITE_API_URL) {
@@ -15,8 +16,22 @@ const api = axios.create({
 });
 
 // Attach the JWT to every request once the user is logged in
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("sms_token");
+api.interceptors.request.use(async (config) => {
+  let token = localStorage.getItem("sms_token");
+
+  // Always prefer fresh Supabase session token to prevent 1-hour expiration
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.access_token) {
+        token = data.session.access_token;
+        localStorage.setItem("sms_token", token);
+      }
+    } catch {
+      // Fall back to stored token
+    }
+  }
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

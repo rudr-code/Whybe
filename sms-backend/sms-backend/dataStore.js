@@ -97,7 +97,7 @@ const users = [
   { _id: "user-admin-001", name: "Dr. Rajesh Kumar", email: "admin@campussync.edu", password: "admin123", role: "admin", dob: "1975-06-15" },
   { _id: "user-faculty-001", name: "Prof. Sunita Sharma", email: "prof.sharma@campussync.edu", password: "faculty123", role: "faculty", dob: "1980-03-22" },
   { _id: "user-faculty-002", name: "Prof. Vikram Mehta", email: "prof.mehta@campussync.edu", password: "faculty123", role: "faculty", dob: "1978-11-05" },
-  { _id: "user-ta-001", name: "Priya Desai", email: "ta.priya@campussync.edu", password: "ta123", role: "ta", dob: "2001-09-10" },
+  { _id: "user-ta-001", name: "Priya Desai", email: "ta.priya@campussync.edu", password: "ta123456", role: "ta", dob: "2001-09-10" },
   { _id: "user-examcell-001", name: "Exam Controller Office", email: "examcell@campussync.edu", password: "examcell123", role: "exam_cell", dob: "1970-01-01" },
 ];
 

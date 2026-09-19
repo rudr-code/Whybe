@@ -19,11 +19,53 @@ const protect = async (req, res, next) => {
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+    token = req.headers.authorization.split(" ")[1];
+
+    // 1. Try Supabase Auth verification first if configured
     try {
-      token = req.headers.authorization.split(" ")[1];
+      const { supabaseAdmin, isSupabaseConfigured } = require("../config/supabase");
+      if (isSupabaseConfigured && supabaseAdmin) {
+        const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
+        if (!authError && authData?.user) {
+          // Query authoritative role from public.profiles
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("id, legacy_id, name, email, role")
+            .eq("id", authData.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            // If student, resolve studentRef
+            let studentRef = null;
+            if (profile.role === "student") {
+              const { data: studentRecord } = await supabaseAdmin
+                .from("students")
+                .select("legacy_id, id")
+                .eq("profile_id", profile.id)
+                .maybeSingle();
+              studentRef = studentRecord?.legacy_id || studentRecord?.id;
+            }
+
+            req.user = {
+              _id: profile.legacy_id || profile.id,
+              id: profile.id,
+              name: profile.name,
+              email: profile.email,
+              role: profile.role,
+              studentRef,
+            };
+            return next();
+          }
+        }
+      }
+    } catch {
+      // Continue to legacy verification
+    }
+
+    try {
       const decoded = jwt.verify(token, JWT_SECRET);
 
-      // 1. Check in-memory dataStore first
+      // 2. Check in-memory dataStore first
       const storeUser = dataStore.findById("users", decoded.id);
       if (storeUser) {
         const { password, ...safeUser } = storeUser;

@@ -24,6 +24,88 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // Lazy provisioning in Supabase if missing
+    try {
+      const { supabaseAdmin, isSupabaseConfigured } = require("../config/supabase");
+      if (isSupabaseConfigured && supabaseAdmin) {
+        const { data: existingProfile, error: pCheckErr } = await supabaseAdmin
+          .from("profiles")
+          .select("id, email")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        if (pCheckErr) {
+          console.error("Supabase profile check error during login:", pCheckErr.message);
+        }
+
+        let authUserId = existingProfile?.id;
+
+        if (!existingProfile) {
+          const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+            email: cleanEmail,
+            password: password,
+            email_confirm: true,
+            user_metadata: { name: user.name }, // role removed from user_metadata
+          });
+
+          if (authErr) {
+            if (authErr.message?.toLowerCase().includes("already registered") || authErr.message?.toLowerCase().includes("already exists")) {
+              // Idempotent recovery: locate auth user ID via paginated listUsers
+              let page = 1;
+              const perPage = 1000;
+              while (true) {
+                const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+                if (listErr) {
+                  console.error("Supabase admin listUsers error:", listErr.message);
+                  break;
+                }
+                const users = listData?.users || [];
+                const found = users.find(u => u.email?.toLowerCase().trim() === cleanEmail);
+                if (found) {
+                  authUserId = found.id;
+                  break;
+                }
+                if (users.length < perPage) break;
+                page++;
+              }
+            } else {
+              console.error("Supabase admin createUser error:", authErr.message);
+            }
+          } else {
+            authUserId = authData?.user?.id;
+          }
+        }
+
+        if (authUserId) {
+          const { error: upsertErr } = await supabaseAdmin.from("profiles").upsert({
+            id: authUserId,
+            legacy_id: user._id,
+            name: user.name,
+            email: cleanEmail,
+            role: user.role, // role stored strictly in public.profiles
+          });
+
+          if (upsertErr) {
+            console.error("Supabase profile upsert error:", upsertErr.message);
+          }
+
+          if (user.role === "student" && user.studentRef) {
+            const { error: linkErr } = await supabaseAdmin
+              .from("students")
+              .update({ profile_id: authUserId })
+              .eq("legacy_id", user.studentRef)
+              .is("profile_id", null);
+
+            if (linkErr) {
+              console.error("Error linking student profile_id in Supabase:", linkErr.message);
+            }
+          }
+        }
+      }
+    } catch (sbErr) {
+      console.error("Supabase lazy provisioning exception during login:", sbErr);
+    }
+
     const response = {
       _id: user._id,
       name: user.name,
